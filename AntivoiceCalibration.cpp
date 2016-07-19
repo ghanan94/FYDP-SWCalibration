@@ -9,8 +9,6 @@
 		-ensure correct amplitude detection
 	-do not need to store test_signal as you can calculate each index
 	-find a way to perform obs signal analysis without storing the entire signal in memory (lower memory consumption)
-	
-
 */
 	
 #define WINDOWS 1
