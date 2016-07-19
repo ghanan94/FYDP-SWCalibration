@@ -4,6 +4,7 @@
 	//MOCK: Simplifies a hardware/embedded problem to the best that can be done to model it using command line sw.
 	//STUB: can't do anything in the command line sw to actually represent this action.
 /*Pending TODOs:
+	-check on gain calculation (likely to do with amplitude detection)
 	-apply white gaussian channel noise to the channel and therefore to the observed signal
 		-ensure correct amplitude detection
 	-do not need to store test_signal as you can calculate each index
@@ -210,7 +211,7 @@ double * ApplyChannel(double * in_signal, unsigned int samples_delay, unsigned i
 	returns:
 		{amplitude of sinusoid, signal delay}
 */
-AMPDELAY_t GetSinusoidalAmplitudeAndDelay(double * h, double f, unsigned int fs, unsigned int signal_array_length)
+AMPDELAY_t DetectSinusoidalAmplitudeAndDelay(double * h, double f, unsigned int fs, unsigned int signal_array_length)
 {
 	AMPDELAY_t ret;
 	double amplitude;
@@ -361,7 +362,7 @@ CALIB_t GetCalibration(double f, double test_amplitude, unsigned int fs, unsigne
 	//TODO above^^
 	
 	//determine amplitude and seconds delay of signal relative to test
-	AMPDELAY_t obs_ampdelay = GetSinusoidalAmplitudeAndDelay(obs_signal, f, fs, signal_array_length);
+	AMPDELAY_t obs_ampdelay = DetectSinusoidalAmplitudeAndDelay(obs_signal, f, fs, signal_array_length);
 	
 	//Determine results
 	CALIB_t result;
@@ -388,8 +389,8 @@ int main(int argc, char ** argv)
 {
 	//TODO: make frequencies be passed as an array by command line?
 
-	//samples per second, resolution of sinusoid (highest freq * 21)
-	unsigned int fs = (unsigned int)round(frequencies[freq_count_pos - 1] * 21);
+	//samples per second or resolution of sinusoid (highest freq * some constant)
+	unsigned int fs = (unsigned int)round(frequencies[freq_count_pos - 1] * 250);
 
 	//Calculate channel delay in terms of samples
 	unsigned int channel_delay_samples = (unsigned int)round(channel_delay_seconds * fs);
