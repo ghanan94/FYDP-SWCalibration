@@ -3,7 +3,15 @@
 	//Strategy document: https://docs.google.com/document/d/10Bu1yvGFMuSSRcf0y2kXYmD8a38s4vKvYzKdGpoMt9Q/edit
 	//MOCK: Simplifies a hardware/embedded problem to the best that can be done to model it using command line sw.
 	//STUB: can't do anything in the command line sw to actually represent this action.
+/*Pending TODOs:
+	-apply white gaussian channel noise to the channel and therefore to the observed signal
+		-ensure correct amplitude detection
+	-do not need to store test_signal as you can calculate each index
+	-find a way to perform obs signal analysis without storing the entire signal in memory (lower memory consumption)
+	
 
+*/
+	
 #define WINDOWS 1
 
 #ifdef WINDOWS
@@ -362,6 +370,10 @@ CALIB_t GetCalibration(double f, double test_amplitude, unsigned int fs, unsigne
 	result.gain = test_amplitude / obs_ampdelay.amplitude;
 	result.rtt = obs_ampdelay.delay;
 	result.internaltime = result.rtt - channel_delay_seconds;
+
+	//free memory
+	free(test_signal);
+	free(obs_signal);
 
 	return result;
 }		
