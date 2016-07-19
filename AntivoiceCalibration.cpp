@@ -1,5 +1,6 @@
 //
 //Definitions: 
+	//Strategy document: https://docs.google.com/document/d/10Bu1yvGFMuSSRcf0y2kXYmD8a38s4vKvYzKdGpoMt9Q/edit
 	//MOCK: Simplifies a hardware/embedded problem to the best that can be done to model it using command line sw.
 	//STUB: can't do anything in the command line sw to actually represent this action.
 
