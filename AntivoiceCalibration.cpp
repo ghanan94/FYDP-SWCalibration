@@ -34,7 +34,7 @@
 struct calibration {
 	double frequency; //frequency of tone
 	double amplitude; //amplitude of tone
-	double gain; //gain needed to equalize (scalar factor, not dB)
+	double eqgain; //gain needed to equalize (scalar factor, not dB)
 	double rtt; //delay in seconds it took for round trip time
 	double internaltime; //rtt minus airtime (does not include computation time)
 };
@@ -366,7 +366,7 @@ CALIB_t GetCalibration(double f, double test_amplitude, unsigned int fs, unsigne
 	CALIB_t result;
 	result.frequency = f;
 	result.amplitude = test_amplitude;
-	result.gain = test_amplitude / obs_ampdelay.amplitude;
+	result.eqgain = test_amplitude / obs_ampdelay.amplitude;
 	result.rtt = obs_ampdelay.delay;
 	result.internaltime = result.rtt - channel_delay_seconds;
 
@@ -379,8 +379,10 @@ CALIB_t GetCalibration(double f, double test_amplitude, unsigned int fs, unsigne
 
 void PrintCalib_t(CALIB_t c)
 {
-	printf("%.2f | %.3f      | %.5f | %.9f | %.9f |\n", 
-		c.frequency, c.amplitude, c.gain, c.rtt, c.internaltime);
+	printf("%.2f | %.3f      | %.5f | %.5f | %.5f | %.9f | %.9f |\n", 
+		c.frequency, c.amplitude, 
+		system_gain[GetFrequenciesArrayIndex(c.frequency)], system_delay[GetFrequenciesArrayIndex(c.frequency)],
+		c.eqgain, c.rtt, c.internaltime);
 }
 
 int main(int argc, char ** argv)
@@ -398,7 +400,7 @@ int main(int argc, char ** argv)
 	
 	CALIB_t calib_results[freq_count_pos * amplitude_count]; //stores the calibratoin results
 
-	printf("\nFreq | Amplitude  | Gain    |  RTT        | Int. Delay  | \n");
+	printf("\nFreq | Amplitude  | Sysgain | SysDelay| eqGain  |  RTT        | Int. Delay  | \n");
 
 	//iterate over all frequencies and collect results for each frequency
 	unsigned int i,j;
