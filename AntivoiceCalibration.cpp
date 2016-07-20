@@ -4,9 +4,10 @@
 	//MOCK: Simplifies a hardware/embedded problem to the best that can be done to model it using command line sw.
 	//STUB: can't do anything in the command line sw to actually represent this action.
 /*Pending TODOs:
-	-check on gain calculation (likely to do with amplitude detection)
-	-apply white gaussian channel noise to the channel and therefore to the observed signal
-		-ensure correct amplitude detection
+	-After applying gaussian noise, amplitude detection is not as accurate
+		-use BPF to improve accuracy:
+			https://sestevenson.wordpress.com/implementation-of-fir-filtering-in-c-part-1/
+	
 	-do not need to store test_signal as you can calculate each index
 	-find a way to perform obs signal analysis without storing the entire signal in memory (lower memory consumption)
 */
@@ -27,6 +28,7 @@
 
 #define SPEED_OF_SOUND (343)
 #define TRANSDUCER_OBS_SEPARATION_DISTANCE_METERS (1.3)
+#define WHITE_NOISE_STD_DEVIATION (0.05)
 
 #define MIN(a,b) (((a)<(b))?(a):(b))
 #define MAX(a,b) (((a)>(b))?(a):(b))
@@ -163,6 +165,42 @@ double * ApplyMicTransducerTransferFunction(double f, unsigned int fs, double * 
 	return changed_signal;
 }
 
+/* 
+	Generates additive white Gaussian Noise samples with zero mean and a standard deviation of @d. 
+	This method is invoked once per sample, and the value it returns should be added to the signal.
+	Author: https://www.embeddedrelated.com/showcode/311.php
+*/
+double AWGN_generator(double d)
+{
+	double temp1;
+	double temp2;
+	double result;
+	int p;
+
+	p = 1;
+
+	while (p > 0)
+	{
+		//rand() function generates an integer between 0 and RAND_MAX,
+			//which is defined in stdlib.h.
+		temp2 = (rand() / ((double)RAND_MAX));
+
+		if (temp2 == 0)
+		{// temp2 is >= (RAND_MAX / 2)
+			p = 1;
+		}// end if
+		else
+		{// temp2 is < (RAND_MAX / 2)
+			p = -1;
+		}// end else
+
+	}// end while()
+
+	temp1 = cos((2.0 * (double)PI) * rand() / ((double)RAND_MAX));
+	result = sqrt(-2.0 * log(temp2)) * temp1;
+
+	return (result * d);
+}
 
 /*
 	Applies channel noise to signal and air time
@@ -181,16 +219,13 @@ double * ApplyChannel(double * in_signal, unsigned int samples_delay, unsigned i
 	//Apply channel delay
 	ApplySampleDelay(out_signal, samples_delay, signal_array_length);
 
+	//Apply channel noise 
 	for (i = 0; i < signal_array_length; i++)
 	{
-		
-
-		//TODO: Apply channel noise
-
+		out_signal[i] += AWGN_generator(WHITE_NOISE_STD_DEVIATION);
 	}
 
 	return out_signal;
-
 }
 
 /*
