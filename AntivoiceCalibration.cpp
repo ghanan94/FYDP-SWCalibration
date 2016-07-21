@@ -4,12 +4,15 @@
 	//MOCK: Simplifies a hardware/embedded problem to the best that can be done to model it using command line sw.
 	//STUB: can't do anything in the command line sw to actually represent this action.
 /*Pending TODOs:
-	-After applying gaussian noise, amplitude detection is not as accurate
-		-use BPF to improve accuracy:
-			https://sestevenson.wordpress.com/implementation-of-fir-filtering-in-c-part-1/
+	-remove mallocs and statically allocate and reuse via memset
+	
+	-think about how the results will be passed to the antivoice algorithm	
+		-it should be passed comma separated by the debug monitor to the computer
+		-then with the calibraiton results, the antivoice algorithm is rebuilt and flashed
 	
 	-do not need to store test_signal as you can calculate each index
 	-find a way to perform obs signal analysis without storing the entire signal in memory (lower memory consumption)
+		-perhaps send it via the serial debug monitor
 */
 	
 #define WINDOWS 1
@@ -20,6 +23,7 @@
 
 #include <math.h>
 #include <stdlib.h>
+#include "fir_filtering.h"
 
 #ifndef PI
 # define PI	3.14159265358979323846264338327950288
@@ -51,8 +55,9 @@ typedef struct amplitude_delay AMPDELAY_t;
 
 
 /* Global variables */
+double duration = 1; //seconds for a given test signal
 const unsigned int freq_count_pos = 4;
-double frequencies[freq_count_pos] = { 1, 2, 3, 4 };
+double frequencies[freq_count_pos] = { 10, 50, 100, 200 };
 double system_gain[freq_count_pos] = { 0.9, 0.8, 0.7, 0.6 };
 double system_delay[freq_count_pos] = { 0.1,0.2,0.3,0.4 };
 
@@ -96,7 +101,7 @@ unsigned int GetFrequenciesArrayIndex(double f)
 	returns:
 		an array of points where each point represents the time domain height of the signal
 */
-double * TestSignalGenerator(double f, double duration, unsigned int fs, double amplitude, unsigned int signal_array_length)
+double * TestSignalGenerator(double f, unsigned int fs, double amplitude, unsigned int signal_array_length)
 {
 	double * test_signal = 0;
 	test_signal = (double *)malloc(signal_array_length * sizeof(double)); //allocate memory
@@ -232,7 +237,7 @@ double * ApplyChannel(double * in_signal, unsigned int samples_delay, unsigned i
 	Returns the amplitude of ideal cosine signal.  
 		Averages all the minimums and maximums, adds them, and divide by 2.
 		This algorithm underestimates the amplitude a little, improves with higher fs.
-		//Optimization available possibly:
+		//Optimization available possibly for later:
 		//We know h is of the form: h[k] = (a)cos(2 * PI * f * (k / N)
 		//therefore amplitude a = h[k] / cos(2 * PI * f * (k / N)
 		//can also assume sinusoid is linear near zero-crossings, and therefore fit the best amplitude between 2 zeros
@@ -362,11 +367,11 @@ AMPDELAY_t DetectSinusoidalAmplitudeAndDelay(double * h, double f, unsigned int 
 CALIB_t GetCalibration(double f, double test_amplitude, unsigned int fs, unsigned int channel_delay_samples)
 {
 	//Generate test signal
-	double duration = 1; //seconds
+	
 
 	unsigned int signal_array_length = (unsigned int)ceil(duration * fs); //total number of samples
 
-	double * test_signal = TestSignalGenerator(f, duration, fs, test_amplitude, signal_array_length);
+	double * test_signal = TestSignalGenerator(f, fs, test_amplitude, signal_array_length);
 
 	//
 	//STUB: Use DAC to send to Speaker driver
@@ -390,9 +395,11 @@ CALIB_t GetCalibration(double f, double test_amplitude, unsigned int fs, unsigne
 	//MOCK: Channel (air / thermal) noise, model as gaussian noise
 	double * obs_signal = ApplyChannel(changed_signal, channel_delay_samples, fs, signal_array_length);
 
-	//Analyze the obs signal relative to test signal to generate calibration outputs needed for antivoice algorithm
-		//filter noise from obs signal by using BPF centered at f
-	//TODO above^^
+	/*Not performing filtering since accurate enough when signal contains over 50 periods, assuming in a quiet room*/
+		//Analyze the obs signal relative to test signal to generate calibration outputs needed for antivoice algorithm
+			//filter noise from obs signal by using BPF centered at f
+		//double * filtered_signal = (double *)malloc(signal_array_length * sizeof(double)); //allocate memory
+		//ApplyFIR(obs_signal, signal_array_length, filtered_signal);
 	
 	//determine amplitude and seconds delay of signal relative to test
 	AMPDELAY_t obs_ampdelay = DetectSinusoidalAmplitudeAndDelay(obs_signal, f, fs, signal_array_length);
@@ -408,7 +415,7 @@ CALIB_t GetCalibration(double f, double test_amplitude, unsigned int fs, unsigne
 	//free memory
 	free(test_signal);
 	free(obs_signal);
-
+	//free(filtered_signal);
 	return result;
 }		
 
@@ -425,7 +432,8 @@ int main(int argc, char ** argv)
 	//TODO: make frequencies be passed as an array by command line?
 
 	//samples per second or resolution of sinusoid (highest freq * some constant)
-	unsigned int fs = (unsigned int)round(frequencies[freq_count_pos - 1] * 250);
+	//unsigned int fs = (unsigned int)round(frequencies[freq_count_pos - 1] * 250);
+	unsigned int fs = 8000;
 
 	//Calculate channel delay in terms of samples
 	unsigned int channel_delay_samples = (unsigned int)round(channel_delay_seconds * fs);
