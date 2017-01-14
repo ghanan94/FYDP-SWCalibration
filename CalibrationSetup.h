@@ -24,7 +24,7 @@ struct calibration {
 	double amplitude; //amplitude of tone
 	double eqgain; //gain needed to equalize (scalar factor, not dB)
 	double rtt; //delay in seconds it took for round trip time
-	double internaltime; //rtt minus airtime (does not include computation time)
+	double internaltime; //rtt minus airtime (signal propagation + computation time)
 };
 typedef struct calibration CALIB_t;
 
