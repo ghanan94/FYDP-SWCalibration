@@ -7,12 +7,13 @@
 	-remove mallocs and statically allocate and reuse via memset
 	
 	-think about how the results will be passed to the antivoice algorithm	
+		revise these these 2 points:
 		-it should be passed comma separated by the debug monitor to the computer
 		-then with the calibraiton results, the antivoice algorithm is rebuilt and flashed
 	
 	-do not need to store test_signal as you can calculate each index
 	-find a way to perform obs signal analysis without storing the entire signal in memory (lower memory consumption)
-		-perhaps send it via the serial debug monitor
+		-perhaps send it via the serial debug monitor to the pc?
 */
 
 #include "CalibrationSetup.h"
@@ -45,7 +46,6 @@ unsigned int GetFrequenciesArrayIndex(double f)
 /*
 	params: 
 		f: frequency
-		duration: in seconds
 		fs: sample rate for DAC, thus signal resolution
 		ampltiude: amplitude of sinusoid
 		signal_array_length: length of test signal to be generated
@@ -54,8 +54,7 @@ unsigned int GetFrequenciesArrayIndex(double f)
 */
 double * TestSignalGenerator(double f, unsigned int fs, double amplitude, unsigned int signal_array_length)
 {
-	double * test_signal = 0;
-	test_signal = (double *)malloc(signal_array_length * sizeof(double)); //allocate memory
+	double * test_signal = (double *)malloc(signal_array_length * sizeof(double)); //allocate memory
 
 	unsigned int i; //the sample number
 	for (i = 0; i < signal_array_length; i++)
@@ -94,7 +93,7 @@ void ApplySampleDelay(double * signal, unsigned int num_samples, unsigned int si
 	Applies magnitude and group delay transfer function to test signal at frequency f
 	parameters:
 		f: frequency in Hz
-		test_signal: array of points, withe each point representing signal height at that sample number
+		test_signal: array of points, with each point representing signal height at that sample number
 	returns:
 		changed_signal, with transfer function applied
 */
@@ -185,14 +184,7 @@ double * ApplyChannel(double * in_signal, unsigned int samples_delay, unsigned i
 }
 
 /*
-	Returns the amplitude of ideal cosine signal.  
-		Averages all the minimums and maximums, adds them, and divide by 2.
-		This algorithm underestimates the amplitude a little, improves with higher fs.
-		//Optimization available possibly for later:
-		//We know h is of the form: h[k] = (a)cos(2 * PI * f * (k / N)
-		//therefore amplitude a = h[k] / cos(2 * PI * f * (k / N)
-		//can also assume sinusoid is linear near zero-crossings, and therefore fit the best amplitude between 2 zeros
-
+	Returns the amplitude of exactly periodic cosine single-tone signal, but amplitude is affected by noise.  
 	params:
 		h: signal level at each sample
 		f: the frequency in Hz
@@ -200,110 +192,61 @@ double * ApplyChannel(double * in_signal, unsigned int samples_delay, unsigned i
 	returns:
 		{amplitude of sinusoid, signal delay}
 */
-AMPDELAY_t DetectSinusoidalAmplitudeAndDelay(double * h, double f, unsigned int fs, unsigned int signal_array_length)
+AMPDELAY_t DetectSinusoidalAmplitudeAndDelay(double * h, const double f, const unsigned int fs, const unsigned int signal_array_length)
 {
 	AMPDELAY_t ret;
-	double amplitude;
+	const int N = (unsigned int)ceil((double)fs / f); //Samples in period
 
-	int N = (unsigned int)ceil((double)fs / f); //Samples in period
-
-	//Step 1: Identify max and min levels across entire signal, and their indices
-	int i = 0;
-	double min = 0, max = 0;
-	int min_index = 0, max_index = 0;
-	while(i < signal_array_length)
+	if (signal_array_length < N)
 	{
-		if (h[i] <= min)
-		{
-			min = h[i];
-			min_index = i;
-		}
-
-		if (h[i] >= max)
-		{
-			max = h[i];
-			max_index = i;
-		}
-		i++;
+		printf("\n ****** \n [ERROR] signal length (duration) is less than period! \n ****** \n");
+		return ret;
 	}
 
-	//Step 2: Sum max and min levels for all periods
-	double minsum = 0, maxsum = 0;
-	int mincount = 0, maxcount = 0;
-
-	//min levels
-	i = min_index;
-	while (i < signal_array_length)
+	//Get the sums of the amplitude to accurately determine the signal offset to the first cosine max
+	double * amplitudeSums = (double *) malloc(sizeof(double) * N);
+	unsigned int * sumsCount = (unsigned int *)malloc(sizeof(unsigned int) * N);
+	for (int i = 0; i < signal_array_length; i++)
 	{
-		if (h[i] < 0.5 * min) //ensure not zeroed out
+		if (i < N)
 		{
-			minsum += h[i];
-			mincount += 1;
+			amplitudeSums[i] = h[i];
+			sumsCount[i] = 1;
 		}
-		
-		i += N;
-	}
-
-	if (min_index - N > 0)
-	{
-		i = min_index - N;
-		while (i >= 0)
+		else
 		{
-			if (h[i] < 0.5 * min) //ensure not zeroed out
-			{
-				minsum += h[i];
-				mincount += 1;
-			}
-			i -= N;
+			amplitudeSums[i % N] += h[i];
+			sumsCount[i % N]++;
 		}
 	}
 
-	//max levels
-	i = max_index;
-	while (i < signal_array_length)
+	//determine the index at which min and max of sinusoids occur across 1 cycle
+	unsigned int minindex = 0;
+	unsigned int maxindex = 0;
+	for (int i = 1; i < N; i++)
 	{
-		if (h[i] > 0.5 * max) //ensure not zeroed out
+		if (amplitudeSums[i] < amplitudeSums[minindex])
 		{
-			maxsum += h[i];
-			maxcount += 1;
+			minindex = i;
 		}
-		i += N;
-	}
-
-	if (max_index - N > 0)
-	{
-		i = max_index - N;
-		while (i >= 0)
+		else if (amplitudeSums[i] > amplitudeSums[maxindex])
 		{
-			if (h[i] > 0.5 * max) //ensure not zeroed out
-			{
-				maxsum += h[i];
-				maxcount += 1;
-			}
-			i -= N;
+			maxindex = i;
 		}
 	}
 
-	//Step 3: Find average of max and min
-	double minavg = minsum / mincount;
-	double maxavg = maxsum / maxcount;
-
-	//Step 4: Calculate amplitude
-	amplitude = (maxavg - minavg) / 2;
-	ret.amplitude = amplitude;
-
-	//Step 5: Calculate delay
-	for (i = 0; i < signal_array_length; i++)
-	{
-		if (h[i] > 0.5 * max)
-		{
-			break; //at this i, cosine maxima starts therefore i is the number of samples delayed by
-		}
-	}
-	unsigned int delay_samples = (unsigned int) i;
+	unsigned int delay_samples = maxindex;
 	double delay_seconds = (double)delay_samples / (double)fs;
 	ret.delay = delay_seconds;
-	
+
+	//Find average of min and max sums, to calculate amplitude
+	double minavg = amplitudeSums[minindex] / sumsCount[minindex];
+	double maxavg = amplitudeSums[maxindex] / sumsCount[maxindex];
+	ret.amplitude = (fabs(maxavg) + fabs(minavg)) / 2; //fabs is abs of floating number
+
+	free(amplitudeSums);
+	free(sumsCount);
+
 	return ret;
 }
 
