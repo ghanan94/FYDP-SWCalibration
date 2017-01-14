@@ -5,6 +5,7 @@
 	//STUB: can't do anything in the command line sw to actually represent this action.
 /*Pending TODOs:
 	-remove mallocs and statically allocate and reuse via memset
+	-change doubles to floats
 	
 	-think about how the results will be passed to the antivoice algorithm	
 		revise these these 2 points:
@@ -194,7 +195,7 @@ double * ApplyChannel(double * in_signal, unsigned int samples_delay, unsigned i
 */
 AMPDELAY_t DetectSinusoidalAmplitudeAndDelay(double * h, const double f, const unsigned int fs, const unsigned int signal_array_length)
 {
-	AMPDELAY_t ret;
+	AMPDELAY_t ret = { 0, 0};
 	const int N = (unsigned int)ceil((double)fs / f); //Samples in period
 
 	if (signal_array_length < N)
@@ -204,8 +205,8 @@ AMPDELAY_t DetectSinusoidalAmplitudeAndDelay(double * h, const double f, const u
 	}
 
 	//Get the sums of the amplitude to accurately determine the signal offset to the first cosine max
-	double * amplitudeSums = (double *) malloc(sizeof(double) * N);
-	unsigned int * sumsCount = (unsigned int *)malloc(sizeof(unsigned int) * N);
+	double * amplitudeSums = (double *)malloc(sizeof(double) * N);
+	double * sumsCount = (double *)malloc(sizeof(double) * N);
 	for (int i = 0; i < signal_array_length; i++)
 	{
 		if (i < N)
@@ -220,19 +221,48 @@ AMPDELAY_t DetectSinusoidalAmplitudeAndDelay(double * h, const double f, const u
 		}
 	}
 
-	//determine the index at which min and max of sinusoids occur across 1 cycle
+	//determine the index at which max of sinusoids occur across 1 cycle (% N)
 	unsigned int minindex = 0;
 	unsigned int maxindex = 0;
 	for (int i = 1; i < N; i++)
 	{
-		if (amplitudeSums[i] < amplitudeSums[minindex])
-		{
-			minindex = i;
-		}
-		else if (amplitudeSums[i] > amplitudeSums[maxindex])
+		if (amplitudeSums[i] > amplitudeSums[maxindex])
 		{
 			maxindex = i;
 		}
+	}
+
+	unsigned int lastmaxima;
+	for (int i = maxindex; i < signal_array_length; i+=N)
+	{
+		lastmaxima = i;
+	}
+
+	//Note: due to delay in signal, the first several cycles may be noise and no signal
+	//Identify the number of samples delayed for start of signal
+	for (int i = maxindex ; i < signal_array_length; i+= N)
+	{
+		//If at least half of the last maxima
+		if (h[i] > 0.5 * h[lastmaxima])
+		{
+			//We found the first true signal maxima
+			maxindex = i;
+			break;
+		}
+		else
+		{
+			amplitudeSums[maxindex] -= h[i];
+			sumsCount[maxindex]--;
+		}
+	}
+
+	//now we do the same for corresponding minimas
+	double minsum = 0;
+	double minsumcount = 0;
+	for (int i = maxindex + N/2; i < signal_array_length; i += N)
+	{
+		minsum += h[i];
+		minsumcount++;
 	}
 
 	unsigned int delay_samples = maxindex;
@@ -240,8 +270,8 @@ AMPDELAY_t DetectSinusoidalAmplitudeAndDelay(double * h, const double f, const u
 	ret.delay = delay_seconds;
 
 	//Find average of min and max sums, to calculate amplitude
-	double minavg = amplitudeSums[minindex] / sumsCount[minindex];
-	double maxavg = amplitudeSums[maxindex] / sumsCount[maxindex];
+	double minavg = minsum / minsumcount;
+	double maxavg = amplitudeSums[maxindex % N] / sumsCount[maxindex % N];
 	ret.amplitude = (fabs(maxavg) + fabs(minavg)) / 2; //fabs is abs of floating number
 
 	free(amplitudeSums);
@@ -294,6 +324,7 @@ CALIB_t GetCalibration(double f, double test_amplitude, unsigned int fs, unsigne
 			//filter noise from obs signal by using BPF centered at f
 		//double * filtered_signal = (double *)malloc(signal_array_length * sizeof(double)); //allocate memory
 		//ApplyFIR(obs_signal, signal_array_length, filtered_signal);
+	//TODO: terrible assumption.  Use FFT to remove all other frequencies not of interest so that no need to hardcode linear filters
 	
 	//determine amplitude and seconds delay of signal relative to test
 	AMPDELAY_t obs_ampdelay = DetectSinusoidalAmplitudeAndDelay(obs_signal, f, fs, signal_array_length);
