@@ -6,15 +6,17 @@
 /*Pending TODOs:
 	-remove mallocs and statically allocate and reuse via memset
 	-change doubles to floats
+	-add #ifdef SIM
 	
-	-think about how the results will be passed to the antivoice algorithm	
-		revise these these 2 points:
-		-it should be passed comma separated by the debug monitor to the computer
+	-how we going to have modes of operation be able to change them at bootup
+	-think about how calibration data is fed into antivoice algorithm	
 		-then with the calibraiton results, the antivoice algorithm is rebuilt and flashed
 	
 	-do not need to store test_signal as you can calculate each index
 	-find a way to perform obs signal analysis without storing the entire signal in memory (lower memory consumption)
 		-perhaps send it via the serial debug monitor to the pc?
+
+	- make a realtime version of this program
 */
 
 #include "CalibrationSetup.h"
@@ -359,7 +361,7 @@ int main(int argc, char ** argv)
 	
 	//Calculate channel delay in terms of samples
 	unsigned int channel_delay_samples = (unsigned int)round(channel_delay_seconds * fs);
-	printf("\n[Warning] channel delay of %.6f seconds rounded to %.6f seconds due to nearest sample.",
+	printf("\n[Info] channel delay of %.6f seconds rounded to %.6f seconds due to nearest sample.",
 		channel_delay_seconds, channel_delay_samples / (double) fs);
 	channel_delay_seconds = channel_delay_samples / (double)fs;
 	
