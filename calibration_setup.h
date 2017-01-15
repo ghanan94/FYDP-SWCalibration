@@ -1,3 +1,7 @@
+#ifndef CALIBRATION_SETUP_H
+#define CALIBRATION_SETUP_H
+#endif
+
 #define WINDOWS 1
 
 #ifdef WINDOWS
@@ -6,15 +10,16 @@
 
 #include <math.h>
 #include <stdlib.h>
-#include "fir_filtering.h"
 
 #ifndef PI
 # define PI	3.14159265358979323846264338327950288
 #endif
 
+#define SIM 1
+#define BOARD (!SIM)
+
 #define SPEED_OF_SOUND (343)
 #define TRANSDUCER_OBS_SEPARATION_DISTANCE_METERS (1.3)
-#define WHITE_NOISE_STD_DEVIATION (0.05)
 
 #define MIN(a,b) (((a)<(b))?(a):(b))
 #define MAX(a,b) (((a)>(b))?(a):(b))
@@ -42,10 +47,7 @@ const double duration = 1; //seconds for a given test signal
 
 const unsigned int freq_count_pos = 4;
 double frequencies[freq_count_pos] = { 10, 50, 100, 200 };
-double system_gain[freq_count_pos] = { 0.9, 0.8, 0.7, 0.6 };
-double system_delay[freq_count_pos] = { 0.1,0.2,0.3,0.4 };
 
-double channel_delay_seconds = (double)TRANSDUCER_OBS_SEPARATION_DISTANCE_METERS / (double)SPEED_OF_SOUND;
 
 const unsigned int amplitude_count = 3;
 double amplitudes[amplitude_count] = { 1, 0.8, 0.6 };
