@@ -1,6 +1,6 @@
 #ifndef CALIBRATION_SETUP_H
 #define CALIBRATION_SETUP_H
-#endif
+
 
 #define WINDOWS 1
 
@@ -40,10 +40,13 @@ struct amplitude_delay {
 typedef struct amplitude_delay AMPDELAY_t;
 
 
+#define TEST_DUR (0.7)	//seconds for a given test signal
+#define MIC_FS (8000)		//sinusoidal resolution, as well as sampling rate
+#define DAC_FS (8000)
 
 /* Global variables */
-const unsigned int fs = 8000; //sinusoidal resolution, as well as sampling rate
-const double duration = 1; //seconds for a given test signal
+
+const unsigned int signal_array_length = (unsigned int) (TEST_DUR * MIC_FS); //total number of samples
 
 const unsigned int freq_count_pos = 4;
 double frequencies[freq_count_pos] = { 10, 50, 100, 200 };
@@ -52,3 +55,5 @@ double frequencies[freq_count_pos] = { 10, 50, 100, 200 };
 const unsigned int amplitude_count = 3;
 double amplitudes[amplitude_count] = { 1, 0.8, 0.6 };
 /* Global variables end */
+
+#endif //CALIBRATION_SETUP_H

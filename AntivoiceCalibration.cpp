@@ -19,7 +19,7 @@
 	- make a realtime version of this program
 */
 
-//#include "calibration_setup.h"
+#include "calibration_setup.h"
 #include "physical_mocking.h"
 
 
@@ -28,11 +28,10 @@
 		f: frequency
 		fs: sample rate for DAC, thus signal resolution
 		ampltiude: amplitude of sinusoid
-		signal_array_length: length of test signal to be generated
 	returns:
 		an array of points where each point represents the time domain height of the signal
 */
-double * TestSignalGenerator(double f, unsigned int fs, double amplitude, unsigned int signal_array_length)
+double * TestSignalGenerator(double f, unsigned int fs, double amplitude)
 {
 	double * test_signal = (double *)malloc(signal_array_length * sizeof(double)); //allocate memory
 
@@ -46,6 +45,19 @@ double * TestSignalGenerator(double f, unsigned int fs, double amplitude, unsign
 	return test_signal;
 }
 
+void playTestToneSample(double f, unsigned int fs, double amplitude, unsigned int sample_number)
+{
+	//create the test signal point for each sample i 
+	double output_sample = amplitude * cos(2 * PI * f * (sample_number / (double)fs));
+
+#ifdef SIM
+	
+#else 
+
+#endif
+	//TODO: send to speaker... (there is only 1 in this case)
+		//in simulation actually send it a statically allocated array
+}
 
 
 
@@ -58,7 +70,7 @@ double * TestSignalGenerator(double f, unsigned int fs, double amplitude, unsign
 	returns:
 		{amplitude of sinusoid, signal delay}
 */
-AMPDELAY_t DetectSinusoidalAmplitudeAndDelay(double * h, const double f, const unsigned int fs, const unsigned int signal_array_length)
+AMPDELAY_t DetectSinusoidalAmplitudeAndDelay(double * h, const double f, const unsigned int fs)
 {
 	AMPDELAY_t ret = { 0, 0};
 	const unsigned int N = (unsigned int)ceil((double)fs / f); //Samples in period
@@ -158,13 +170,23 @@ CALIB_t GetCalibration(double f, double test_amplitude, unsigned int fs)
 	//Generate test signal
 	
 
-	unsigned int signal_array_length = (unsigned int)ceil(duration * fs); //total number of samples
+	
 
-	double * test_signal = TestSignalGenerator(f, fs, test_amplitude, signal_array_length);
+	double * test_signal = TestSignalGenerator(f, fs, test_amplitude);
 
-	//
-	//STUB: Use DAC to send to Speaker driver
-	//
+	//Need to alterate between sending and receiving...?
+	unsigned int samples_sent = 0;
+	while (samples_sent < signal_array_length)
+	{
+		//send tone to speaker
+		playTestToneSample(f, fs, test_amplitude, samples_sent);
+
+	}
+
+	//instead of generating entire array of test signal ... we should have a function with a static variable i
+		//it should create one audio sample at a time
+		//there should be playTone function which in simulation simply copies it to a statically allocated global array
+			//which then get mic sample gets it from that array..
 
 	//MOCK: We model the time it takes for sound to travel from transducer to observation microphone
 		//v = d/t => t = d/v;  
@@ -178,11 +200,12 @@ CALIB_t GetCalibration(double f, double test_amplitude, unsigned int fs)
 		//MOCK: observation magnitude response and group delay
 		//transducer and obs mic are bundled together as 1 transfer function
 	
-	double * changed_signal = ApplyMicTransducerTransferFunction(f, fs, test_signal, signal_array_length);
+	//TODO: move this to get mic sample
+	double * changed_signal = ApplyMicTransducerTransferFunction(f, fs, test_signal);
 
-
+	//TODO move this to get mic sample
 	//MOCK: Channel (air / thermal) noise, model as gaussian noise
-	double * obs_signal = ApplyChannel(changed_signal, fs, signal_array_length);
+	double * obs_signal = ApplyChannel(changed_signal, fs);
 
 	/*Not performing filtering since accurate enough when signal contains over 50 periods, assuming in a quiet room*/
 		//Analyze the obs signal relative to test signal to generate calibration outputs needed for antivoice algorithm
@@ -192,7 +215,7 @@ CALIB_t GetCalibration(double f, double test_amplitude, unsigned int fs)
 	//TODO: terrible assumption.  Use FFT to remove all other frequencies not of interest so that no need to hardcode linear filters
 	
 	//determine amplitude and seconds delay of signal relative to test
-	AMPDELAY_t obs_ampdelay = DetectSinusoidalAmplitudeAndDelay(obs_signal, f, fs, signal_array_length);
+	AMPDELAY_t obs_ampdelay = DetectSinusoidalAmplitudeAndDelay(obs_signal, f, fs);
 	
 	//Determine results
 	CALIB_t result;
@@ -216,11 +239,11 @@ int main(int argc, char ** argv)
 
 	/* MOCKING */
 	//Calculate channel delay in terms of samples
-	unsigned int channel_delay_samples = (unsigned int)round(channel_delay_seconds * fs);
+	unsigned int channel_delay_samples = (unsigned int)round(channel_delay_seconds * MIC_FS);
 	printf("\n[Info] channel delay of %.6f seconds rounded to %.6f seconds due to nearest sample.",
-		channel_delay_seconds, channel_delay_samples / (double) fs);
+		channel_delay_seconds, channel_delay_samples / (double)MIC_FS);
 	//Update the seconds value to the actual number of samples we are using in the system
-	channel_delay_seconds = channel_delay_samples / (double)fs;
+	channel_delay_seconds = channel_delay_samples / (double)MIC_FS;
 	/* END MOCKING */
 	
 	CALIB_t calib_results[freq_count_pos * amplitude_count]; //stores the calibration results
@@ -233,7 +256,7 @@ int main(int argc, char ** argv)
 	{
 		for (j = 0; j < amplitude_count; j++)
 		{
-			calib_results[i + j] = GetCalibration(frequencies[i], amplitudes[j], fs);
+			calib_results[i + j] = GetCalibration(frequencies[i], amplitudes[j], MIC_FS);
 
 			//MOCK
 			PrintCalib_t(calib_results[i + j]);
